@@ -1,14 +1,45 @@
+import { useState } from "react";
 import Header from "../../components/Header";
 import ProgressStepper from "../../components/ProgressStepper";
+import { apiRequest } from "../../services/api";
 
-function MfaSetup() {
+function MfaSetup({ userId, setCurrentScreen, setMfaOtpauthUrl }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleSetupMfa = async () => {
+    if (!userId) {
+      alert("User information not found. Please register again.");
+      return;
+    }
+
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      const data = await apiRequest("/mfa/setup", {
+        method: "POST",
+        body: JSON.stringify({
+          userId,
+        }),
+      });
+
+      setMfaOtpauthUrl(data.otpauthUrl);
+
+      setCurrentScreen("authenticatorSetup");
+    } catch (error) {
+      console.error("MFA setup error:", error);
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f8fc] text-[#171923]">
       <Header />
 
       <main className="mx-auto flex min-h-[calc(100vh-64px)] max-w-[1180px] items-center justify-center px-5 py-10">
         <section className="w-full max-w-[620px] rounded-xl border border-[#e4e6ed] bg-white px-6 py-8 shadow-[0_2px_12px_rgba(20,20,40,0.04)] sm:px-10">
-
           {/* Progress */}
           <div className="mb-8">
             <ProgressStepper activeStep={4} />
@@ -21,25 +52,21 @@ function MfaSetup() {
             </h1>
 
             <p className="mx-auto mt-2 max-w-[440px] text-[12px] leading-5 text-[#777b86]">
-              Add an extra layer of security to your account by setting up
-              an authenticator app.
+              Add an extra layer of security to your account by setting up an
+              authenticator app.
             </p>
           </div>
 
           {/* Security icon */}
           <div className="mx-auto mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-[#eef1ff]">
-            <svg
-              width="25"
-              height="25"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
+            <svg width="25" height="25" viewBox="0 0 24 24" fill="none">
               <path
                 d="M12 3L19 6V11C19 15.5 16.3 19.4 12 21C7.7 19.4 5 15.5 5 11V6L12 3Z"
                 stroke="#3155e8"
                 strokeWidth="1.8"
                 strokeLinejoin="round"
               />
+
               <path
                 d="M9 12L11.2 14.2L15.5 9.8"
                 stroke="#3155e8"
@@ -79,14 +106,15 @@ function MfaSetup() {
             </div>
           </div>
 
-          {/* Continue */}
+          {/* Set Up MFA */}
           <button
             type="button"
+            onClick={handleSetupMfa}
+            disabled={loading}
             className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc]"
           >
             Set Up MFA
           </button>
-
           {/* Footer */}
           <p className="mt-7 text-center text-[9px] text-[#a0a2aa]">
             © 2024 SecureID. All rights reserved.

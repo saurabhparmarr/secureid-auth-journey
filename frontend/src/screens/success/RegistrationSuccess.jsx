@@ -1,7 +1,7 @@
 import Header from "../../components/Header";
 import ProgressStepper from "../../components/ProgressStepper";
 
-function RegistrationSuccess() {
+function RegistrationSuccess({ setCurrentScreen }) {
   return (
     <div className="min-h-screen bg-[#f7f8fc] text-[#171923]">
       <Header />
@@ -94,6 +94,7 @@ function RegistrationSuccess() {
           {/* Login */}
           <button
             type="button"
+            onClick={() => setCurrentScreen("login")}
             className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc]"
           >
             Continue to Login

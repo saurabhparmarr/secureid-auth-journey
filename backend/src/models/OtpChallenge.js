@@ -44,6 +44,11 @@ const otpChallengeSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    invalidated: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

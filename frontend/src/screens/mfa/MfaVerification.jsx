@@ -1,7 +1,102 @@
+import { useRef, useState } from "react";
 import Header from "../../components/Header";
 import ProgressStepper from "../../components/ProgressStepper";
+import { apiRequest } from "../../services/api";
 
-function MfaVerification() {
+function MfaVerification({ userId, setCurrentScreen }) {
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const inputRefs = useRef([]);
+
+  const handleOtpChange = (index, value) => {
+    if (!/^\d*$/.test(value)) return;
+
+    setErrorMessage("");
+
+    const digits = value.slice(0, 6 - index).split("");
+
+    const updatedOtp = [...otp];
+    digits.forEach((digit, offset) => {
+      updatedOtp[index + offset] = digit;
+    });
+
+    setOtp(updatedOtp);
+
+    const nextIndex = Math.min(index + digits.length, 5);
+    if (digits.length) {
+      inputRefs.current[nextIndex]?.focus();
+    }
+  };
+
+  const handleKeyDown = (index, e) => {
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      setErrorMessage("");
+
+      const updatedOtp = [...otp];
+      if (otp[index]) {
+        updatedOtp[index] = "";
+      } else if (index > 0) {
+        updatedOtp[index - 1] = "";
+        inputRefs.current[index - 1]?.focus();
+      }
+      setOtp(updatedOtp);
+    }
+  };
+
+  const handlePaste = (index, e) => {
+    const pastedCode = e.clipboardData.getData("text").replace(/\D/g, "");
+
+    if (!pastedCode) return;
+
+    e.preventDefault();
+    setErrorMessage("");
+
+    const updatedOtp = [...otp];
+    pastedCode.slice(0, 6 - index).split("").forEach((digit, offset) => {
+      updatedOtp[index + offset] = digit;
+    });
+    setOtp(updatedOtp);
+    inputRefs.current[Math.min(index + pastedCode.length, 5)]?.focus();
+  };
+
+  const handleVerify = async () => {
+    setErrorMessage("");
+
+    const token = otp.join("");
+
+    if (token.length !== 6) {
+      setErrorMessage("Please enter the complete 6-digit authentication code.");
+      return;
+    }
+
+    if (!userId) {
+      setErrorMessage("User information not found. Please register again.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await apiRequest("/mfa/verify", {
+        method: "POST",
+        body: JSON.stringify({
+          userId,
+          token,
+        }),
+      });
+
+      setCurrentScreen("success");
+    } catch (error) {
+      console.error("MFA verification error:", error);
+      setErrorMessage(error.message || "MFA verification failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f8fc] text-[#171923]">
       <Header />
@@ -33,16 +128,33 @@ function MfaVerification() {
             </label>
 
             <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5, 6].map((item) => (
+              {otp.map((value, index) => (
                 <input
-                  key={item}
+                  key={index}
+                  ref={(element) => {
+                    inputRefs.current[index] = element;
+                  }}
                   type="text"
                   maxLength="1"
                   inputMode="numeric"
+                  value={value}
+                  onChange={(e) =>
+                    handleOtpChange(index, e.target.value)
+                  }
+                  onKeyDown={(e) => handleKeyDown(index, e)}
+                  onPaste={(e) => handlePaste(index, e)}
                   className="h-11 w-10 rounded-md border border-[#dfe1e8] text-center text-[16px] font-semibold outline-none focus:border-[#3155e8]"
                 />
               ))}
             </div>
+
+            {errorMessage && (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-center">
+                <p className="text-[10px] font-medium text-red-600">
+                  {errorMessage}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Help */}
@@ -56,15 +168,18 @@ function MfaVerification() {
           {/* Verify */}
           <button
             type="button"
-            className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc]"
+            onClick={handleVerify}
+            disabled={loading}
+            className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Verify & Continue
+            {loading ? "Verifying..." : "Verify & Continue"}
           </button>
 
           {/* Footer */}
           <p className="mt-7 text-center text-[9px] text-[#a0a2aa]">
             © 2024 SecureID. All rights reserved.
           </p>
+
         </section>
       </main>
     </div>

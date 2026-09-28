@@ -1,6 +1,7 @@
 const express = require("express");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
+const mfaRoutes = require("./routes/mfaRoutes");
 const cors = require("cors");
 require("dotenv").config();
 
@@ -19,6 +20,7 @@ app.use(
 
 app.use(express.json());
 app.use("/api", authRoutes);
+app.use("/api/mfa", mfaRoutes);
 
 // Test route
 app.get("/api/health", (req, res) => {

@@ -2,7 +2,12 @@ import Header from "../../components/Header";
 import ProgressStepper from "../../components/ProgressStepper";
 import PasswordRequirements from "../../components/PasswordRequirements";
 
-function Registration({ form, handleChange, handleSubmit }) {
+function Registration({
+  form,
+  handleChange,
+  handleSubmit,
+  error,
+}) {
   return (
     <div className="min-h-screen bg-[#f7f8fc] text-[#171923]">
       {/* Header */}
@@ -11,6 +16,7 @@ function Registration({ form, handleChange, handleSubmit }) {
       {/* Main */}
       <main className="mx-auto flex min-h-[calc(100vh-64px)] max-w-[1180px] items-center justify-center px-5 py-10">
         <section className="w-full max-w-[930px] rounded-xl border border-[#e4e6ed] bg-white px-6 py-7 shadow-[0_2px_12px_rgba(20,20,40,0.04)] sm:px-10 sm:py-8">
+
           {/* Progress */}
           <div className="mb-8">
             <ProgressStepper activeStep={1} />
@@ -30,8 +36,10 @@ function Registration({ form, handleChange, handleSubmit }) {
           {/* Form */}
           <form onSubmit={handleSubmit}>
             <div className="grid gap-7 lg:grid-cols-[1fr_300px]">
+
               {/* LEFT */}
               <div className="space-y-5">
+
                 {/* Full Name */}
                 <div>
                   <label className="mb-2 block text-[11px] font-semibold text-[#3d404a]">
@@ -60,8 +68,19 @@ function Registration({ form, handleChange, handleSubmit }) {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="priya.sharma@email.com"
-                    className="h-[42px] w-full rounded-md border border-[#dfe1e8] px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8]"
+                    className={`h-[42px] w-full rounded-md border px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8] ${
+                      error?.toLowerCase().includes("email")
+                        ? "border-red-400"
+                        : "border-[#dfe1e8]"
+                    }`}
                   />
+
+                  {/* Email error */}
+                  {error?.toLowerCase().includes("email") && (
+                    <p className="mt-1.5 text-[10px] text-red-500">
+                      {error}
+                    </p>
+                  )}
                 </div>
 
                 {/* Mobile */}
@@ -89,9 +108,20 @@ function Registration({ form, handleChange, handleSubmit }) {
                       onChange={handleChange}
                       placeholder="98765 43210"
                       maxLength="10"
-                      className="h-[42px] flex-1 rounded-md border border-[#dfe1e8] px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8]"
+                      className={`h-[42px] flex-1 rounded-md border px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8] ${
+                        error?.toLowerCase().includes("mobile")
+                          ? "border-red-400"
+                          : "border-[#dfe1e8]"
+                      }`}
                     />
                   </div>
+
+                  {/* Mobile error */}
+                  {error?.toLowerCase().includes("mobile") && (
+                    <p className="mt-1.5 text-[10px] text-red-500">
+                      {error}
+                    </p>
+                  )}
                 </div>
 
                 {/* Password */}
@@ -143,6 +173,17 @@ function Registration({ form, handleChange, handleSubmit }) {
               <PasswordRequirements />
             </div>
 
+            {/* General error */}
+            {error &&
+              !error.toLowerCase().includes("email") &&
+              !error.toLowerCase().includes("mobile") && (
+                <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                  <p className="text-[11px] text-red-600">
+                    {error}
+                  </p>
+                </div>
+              )}
+
             {/* Create Account */}
             <button
               type="submit"
@@ -155,7 +196,12 @@ function Registration({ form, handleChange, handleSubmit }) {
           {/* Login */}
           <p className="mt-5 text-center text-[10px] text-[#858894]">
             Already have an account?{" "}
-            <button className="font-semibold text-[#3155e8]">Login</button>
+            <button
+              type="button"
+              className="font-semibold text-[#3155e8]"
+            >
+              Login
+            </button>
           </p>
 
           {/* Footer */}
@@ -167,25 +213,5 @@ function Registration({ form, handleChange, handleSubmit }) {
     </div>
   );
 }
-
-function ProgressStep({ number, active }) {
-  return (
-    <div
-      className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold ${
-        active
-          ? "bg-[#2449df] text-white"
-          : "border border-[#dfe2eb] bg-white text-[#8e929d]"
-      }`}
-    >
-      {number}
-    </div>
-  );
-}
-
-function ProgressLine() {
-  return <div className="h-px w-10 bg-[#e2e4eb] sm:w-16" />;
-}
-
-
 
 export default Registration;

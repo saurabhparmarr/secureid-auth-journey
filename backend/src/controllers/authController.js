@@ -1,32 +1,48 @@
 const bcrypt = require("bcryptjs");
+const mongoose = require("mongoose");
 const { createOtpChallenge, verifyOtp } = require("../services/otpService");
 
 const User = require("../models/User");
+const OtpChallenge = require("../models/OtpChallenge");
 
 
 const registerUser = async (req, res) => {
+  let createdUser;
+
   try {
     const { fullName, email, countryCode, mobile, password, terms } = req.body;
+    const normalizedEmail =
+      typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedName =
+      typeof fullName === "string" ? fullName.trim() : "";
+    const normalizedMobile =
+      typeof mobile === "string" ? mobile.trim() : "";
+    const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+    const validMobile = /^\d{10}$/.test(normalizedMobile);
+    const validCountryCode = ["+1", "+44", "+91"].includes(countryCode);
 
-    // 1. Validate required fields
-    if (!fullName || !email || !countryCode || !mobile || !password) {
+    if (!normalizedName || !validEmail || !validMobile || !password) {
       return res.status(400).json({
         success: false,
-        message: "All registration fields are required.",
+        message: !normalizedName
+          ? "Full name is required."
+          : !validEmail
+            ? "Please enter a valid email address."
+            : !validMobile || !validCountryCode
+              ? "Please enter a valid mobile number."
+              : "Password is required.",
       });
     }
 
-    // 2. Terms must be accepted
-    if (!terms) {
+    if (terms !== true) {
       return res.status(400).json({
         success: false,
         message: "Please accept the Terms & Conditions and Privacy Policy.",
       });
     }
 
-    // 3. Check whether email already exists
     const existingEmail = await User.findOne({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
     });
 
     if (existingEmail) {
@@ -36,9 +52,8 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // 4. Check whether mobile already exists
     const existingMobile = await User.findOne({
-      mobile,
+      mobile: normalizedMobile,
     });
 
     if (existingMobile) {
@@ -48,33 +63,51 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // 5. Hash password before storing it
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // 6. Create user
-    const user = await User.create({
-      fullName: fullName.trim(),
-      email: email.toLowerCase().trim(),
+    createdUser = await User.create({
+      fullName: normalizedName,
+      email: normalizedEmail,
       countryCode,
-      mobile: mobile.trim(),
+      mobile: normalizedMobile,
       password: passwordHash,
     });
 
-    // 7. Generate first OTP for email verification
     const challenge = await createOtpChallenge({
-      userId: user._id,
+      userId: createdUser._id,
       purpose: "email_verification",
       method: "email",
     });
 
-    // 8. Don't send password or OTP to frontend
     return res.status(201).json({
       success: true,
       message: "Registration started. Email verification is required.",
+      userId: createdUser._id,
       challengeId: challenge._id,
+      challengeExpiresAt: challenge.expiresAt,
       nextStep: "email_verification",
     });
   } catch (error) {
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0];
+
+      return res.status(409).json({
+        success: false,
+        message:
+          duplicateField === "mobile"
+            ? "An account with this mobile number already exists."
+            : "An account with this email already exists.",
+      });
+    }
+
+    if (createdUser) {
+      try {
+        await User.deleteOne({ _id: createdUser._id });
+      } catch (cleanupError) {
+        console.error("Failed to clean up incomplete registration:", cleanupError);
+      }
+    }
+
     console.error("Registration error:", error);
 
     return res.status(500).json({
@@ -84,20 +117,111 @@ const registerUser = async (req, res) => {
   }
 };
 
+const getRegistrationStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    const user = await User.findById(userId).select(
+      "_id emailVerified mobileVerified mfaEnabled mfaVerified mfaSecret"
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    const purpose = user.emailVerified
+      ? "sms_verification"
+      : "email_verification";
+    const method = user.emailVerified ? "sms" : "email";
+    const latestChallenge = await OtpChallenge.findOne({
+      userId: user._id,
+      purpose,
+      method,
+    }).sort({ createdAt: -1 });
+    const activeChallenge =
+      latestChallenge &&
+      !latestChallenge.verified &&
+      !latestChallenge.invalidated &&
+      latestChallenge.expiresAt > new Date() &&
+      latestChallenge.attempts < latestChallenge.maxAttempts
+        ? latestChallenge
+        : null;
+    const challengeStatus = !latestChallenge
+      ? "missing"
+      : latestChallenge.attempts >= latestChallenge.maxAttempts
+        ? "attempts_exhausted"
+        : latestChallenge.invalidated
+          ? "invalidated"
+          : latestChallenge.verified
+            ? "used"
+            : latestChallenge.expiresAt <= new Date()
+              ? "expired"
+              : "active";
+
+    let nextStep = "emailOtp";
+
+    if (user.emailVerified && !user.mobileVerified) {
+      nextStep = "mobileOtp";
+    } else if (user.emailVerified && user.mobileVerified) {
+      nextStep =
+        user.mfaEnabled && user.mfaVerified
+          ? "success"
+          : "mfaSetup";
+    }
+
+    return res.status(200).json({
+      success: true,
+      userId: user._id,
+      emailVerified: user.emailVerified,
+      mobileVerified: user.mobileVerified,
+      mfaEnabled: user.mfaEnabled,
+      mfaVerified: user.mfaVerified,
+      challengeId: activeChallenge?._id || null,
+      challengeExpiresAt: activeChallenge?.expiresAt || null,
+      challengeStatus,
+      mfaSetupInitialized: Boolean(user.mfaSecret),
+      nextStep,
+    });
+  } catch (error) {
+    console.error("Registration status error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while loading registration status.",
+    });
+  }
+};
+
 const verifyEmailOtp = async (req, res) => {
   try {
     const { challengeId, otp } = req.body;
 
-    if (!challengeId || !otp) {
+    if (
+      !mongoose.Types.ObjectId.isValid(challengeId) ||
+      typeof otp !== "string" ||
+      !/^\d{6}$/.test(otp)
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Challenge ID and OTP are required.",
+        reason: "INVALID_OTP_INPUT",
+        message: "A valid challenge ID and 6-digit OTP are required.",
       });
     }
 
     const result = await verifyOtp({
       challengeId,
       otp,
+      purpose: "email_verification",
+      method: "email",
     });
 
     if (!result.success) {
@@ -106,13 +230,15 @@ const verifyEmailOtp = async (req, res) => {
         OTP_ALREADY_USED: 400,
         OTP_EXPIRED: 400,
         MAX_ATTEMPTS_EXCEEDED: 429,
+        OTP_INVALIDATED: 400,
         INVALID_OTP: 400,
       };
 
       return res.status(statusMap[result.reason] || 400).json({
         success: false,
         reason: result.reason,
-        message: getOtpErrorMessage(result.reason),
+        message: getOtpErrorMessage(result),
+        attemptsRemaining: result.attemptsRemaining,
       });
     }
 
@@ -143,20 +269,203 @@ const verifyEmailOtp = async (req, res) => {
     });
   }
 };
+const sendEmailOtp = async (req, res) => {
+  try {
+    const { userId, resend = false } = req.body;
 
-const getOtpErrorMessage = (reason) => {
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required.",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is already verified.",
+      });
+    }
+
+    const challenge = await createOtpChallenge({
+      userId: user._id,
+      purpose: "email_verification",
+      method: "email",
+      forceNew: resend === true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "A new email OTP has been generated.",
+      challengeId: challenge._id,
+      challengeExpiresAt: challenge.expiresAt,
+      nextStep: "email_verification",
+    });
+  } catch (error) {
+    console.error("Email OTP resend error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while sending the email OTP.",
+    });
+  }
+};
+const getOtpErrorMessage = ({ reason, attemptsRemaining }) => {
+  if (reason === "INVALID_OTP") {
+    return `Invalid OTP. You have ${attemptsRemaining} attempts remaining.`;
+  }
+
   const messages = {
-    CHALLENGE_NOT_FOUND: "OTP challenge not found.",
+    CHALLENGE_NOT_FOUND:
+      "OTP challenge not found. Please request a new OTP.",
     OTP_ALREADY_USED: "This OTP has already been used.",
-    OTP_EXPIRED: "This OTP has expired. Please request a new OTP.",
+    OTP_EXPIRED: "OTP has expired. Please request a new OTP.",
+    OTP_INVALIDATED: "This OTP is no longer valid. Please request a new OTP.",
     MAX_ATTEMPTS_EXCEEDED:
-      "Maximum OTP attempts exceeded. Please request a new OTP.",
-    INVALID_OTP: "The OTP you entered is incorrect. Please try again.",
+      "Maximum OTP attempts reached. Please request a new OTP.",
   };
 
   return messages[reason] || "OTP verification failed.";
 };
+const sendSmsOtp = async (req, res) => {
+  try {
+    const { userId, resend = false } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required.",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    if (!user.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Please verify your email first.",
+      });
+    }
+
+    if (user.mobileVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number is already verified.",
+      });
+    }
+
+    const challenge = await createOtpChallenge({
+      userId: user._id,
+      purpose: "sms_verification",
+      method: "sms",
+      forceNew: resend === true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "SMS OTP generated successfully.",
+      challengeId: challenge._id,
+      challengeExpiresAt: challenge.expiresAt,
+      nextStep: "sms_verification",
+    });
+  } catch (error) {
+    console.error("SMS OTP error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while generating the SMS OTP.",
+    });
+  }
+};
+const verifySmsOtp = async (req, res) => {
+  try {
+    const { challengeId, otp } = req.body;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(challengeId) ||
+      typeof otp !== "string" ||
+      !/^\d{6}$/.test(otp)
+    ) {
+      return res.status(400).json({
+        success: false,
+        reason: "INVALID_OTP_INPUT",
+        message: "A valid challenge ID and 6-digit OTP are required.",
+      });
+    }
+
+    const result = await verifyOtp({
+      challengeId,
+      otp,
+      purpose: "sms_verification",
+      method: "sms",
+    });
+
+    if (!result.success) {
+      const statusMap = {
+        CHALLENGE_NOT_FOUND: 404,
+        OTP_ALREADY_USED: 400,
+        OTP_EXPIRED: 400,
+        MAX_ATTEMPTS_EXCEEDED: 429,
+        OTP_INVALIDATED: 400,
+        INVALID_OTP: 400,
+      };
+
+      return res.status(statusMap[result.reason] || 400).json({
+        success: false,
+        reason: result.reason,
+        message: getOtpErrorMessage(result),
+        attemptsRemaining: result.attemptsRemaining,
+      });
+    }
+
+    const user = await User.findById(result.challenge.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    user.mobileVerified = true;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Mobile number verified successfully.",
+      nextStep: "mfa_setup",
+      userId: user._id,
+    });
+  } catch (error) {
+    console.error("SMS OTP verification error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while verifying the SMS OTP.",
+    });
+  }
+};
 module.exports = {
   registerUser,
+  getRegistrationStatus,
+  sendEmailOtp,
   verifyEmailOtp,
+  sendSmsOtp,
+  verifySmsOtp,
 };

@@ -48,6 +48,16 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    mfaVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    mfaSecret: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
