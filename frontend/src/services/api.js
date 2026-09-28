@@ -2,7 +2,13 @@ const configuredApiUrl = import.meta.env.VITE_API_URL;
 const apiUrl =
   configuredApiUrl ||
   (import.meta.env.DEV ? "http://localhost:5000/api" : "");
-const API_URL = apiUrl.replace(/\/+$/, "");
+const normalizedApiUrl = apiUrl.replace(/\/+$/, "");
+const API_URL =
+  normalizedApiUrl && /\/api$/i.test(normalizedApiUrl)
+    ? normalizedApiUrl
+    : normalizedApiUrl
+      ? `${normalizedApiUrl}/api`
+      : "";
 
 export const apiRequest = async (endpoint, options = {}) => {
   if (!API_URL) {
