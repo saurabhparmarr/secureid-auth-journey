@@ -6,6 +6,7 @@ import { apiRequest } from "../../services/api";
 
 function MobileOtp({
   userId,
+  mobile,
   challengeId,
   challengeExpiresAt,
   challengeStatus,
@@ -24,6 +25,7 @@ function MobileOtp({
 
   const inputRefs = useRef([]);
   const initialRequestStarted = useRef(false);
+  const requestInFlight = useRef(false);
 
   useEffect(() => {
     if (!autoSendInitialOtp || initialRequestStarted.current) return;
@@ -40,6 +42,8 @@ function MobileOtp({
       }
 
       try {
+        requestInFlight.current = true;
+        setResending(true);
         const data = await apiRequest("/send-sms-otp", {
           method: "POST",
           body: JSON.stringify({
@@ -60,6 +64,9 @@ function MobileOtp({
         setErrorMessage(
           error.message || "Unable to send SMS OTP."
         );
+      } finally {
+        requestInFlight.current = false;
+        setResending(false);
       }
     };
 
@@ -184,6 +191,7 @@ function MobileOtp({
   };
 
   const handleVerify = async () => {
+    if (requestInFlight.current) return;
     setErrorMessage("");
 
     const enteredOtp = otp.join("");
@@ -201,6 +209,7 @@ function MobileOtp({
     }
 
     try {
+      requestInFlight.current = true;
       setLoading(true);
 
       await apiRequest("/verify-sms-otp", {
@@ -245,11 +254,13 @@ function MobileOtp({
         );
       }
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
+    if (requestInFlight.current) return;
     if (!userId) {
       setErrorMessage(
         "User information not found. Please register again."
@@ -258,6 +269,7 @@ function MobileOtp({
     }
 
     try {
+      requestInFlight.current = true;
       setResending(true);
       setErrorMessage("");
 
@@ -283,6 +295,7 @@ function MobileOtp({
         error.message || "Unable to resend OTP."
       );
     } finally {
+      requestInFlight.current = false;
       setResending(false);
     }
   };
@@ -298,6 +311,12 @@ function MobileOtp({
             <ProgressStepper activeStep={3} />
           </div>
 
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#e9f8ef] text-[#22a060]">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M7 3h3l2 5-2 1.5a14 14 0 0 0 4.5 4.5L16 12l5 2v3c0 1.1-.9 2-2 2C10.2 19 5 13.8 5 5c0-1.1.9-2 2-2Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+            </svg>
+          </div>
+
           <div className="text-center">
             <h1 className="text-[22px] font-bold tracking-[-0.4px]">
               Verify your mobile number
@@ -308,7 +327,7 @@ function MobileOtp({
             </p>
 
             <p className="mt-1 text-[12px] font-semibold text-[#3d404a]">
-              Verification code sent to your mobile
+              {mobile || "your mobile number"}
             </p>
           </div>
 
@@ -317,7 +336,7 @@ function MobileOtp({
               Enter OTP
             </label>
 
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-2 max-[380px]:gap-1 max-[340px]:gap-0.5">
               {otp.map((value, index) => (
                 <input
                   key={index}
@@ -327,13 +346,14 @@ function MobileOtp({
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
+                  disabled={!challengeId || loading || resending}
                   value={value}
                   onChange={(e) =>
                     handleOtpChange(index, e.target.value)
                   }
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={(e) => handlePaste(index, e)}
-                  className={`h-11 w-10 rounded-md border text-center text-[16px] font-semibold outline-none ${
+                  className={`h-10 w-10 max-[380px]:h-9 max-[380px]:w-8 max-[340px]:w-7 rounded-md border text-center text-[16px] font-semibold outline-none disabled:bg-[#f5f6f9] ${
                     errorMessage
                       ? "border-red-400 text-red-600"
                       : "border-[#dfe1e8] focus:border-[#3155e8]"
@@ -343,8 +363,8 @@ function MobileOtp({
             </div>
 
             {errorMessage && (
-              <div className="mt-3 text-center">
-                <p className="text-[10px] font-medium text-red-500">
+              <div className="mx-auto mt-3 max-w-[440px] rounded-md bg-[#fff1f2] px-3 py-2 text-center">
+                <p className="text-[10px] font-medium leading-4 text-red-600" role="alert">
                   {errorMessage}
                 </p>
               </div>
@@ -362,7 +382,7 @@ function MobileOtp({
           <button
             type="button"
             onClick={handleVerify}
-            disabled={loading}
+            disabled={loading || resending || !challengeId}
             className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Verifying..." : "Verify Mobile Number"}
@@ -373,7 +393,7 @@ function MobileOtp({
             <button
               type="button"
               onClick={handleResend}
-              disabled={resending}
+              disabled={resending || loading}
               className="font-semibold text-[#3155e8] disabled:opacity-50"
             >
               {resending ? "Sending..." : "Resend OTP"}

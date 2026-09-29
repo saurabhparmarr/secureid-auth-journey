@@ -24,6 +24,7 @@ function EmailOtp({
   const [secondsRemaining, setSecondsRemaining] = useState(null);
 
   const inputRefs = useRef([]);
+  const requestInFlight = useRef(false);
 
   useEffect(() => {
     if (!challengeExpiresAt) {
@@ -136,6 +137,7 @@ function EmailOtp({
   };
 
   const handleVerify = async () => {
+    if (requestInFlight.current) return;
     setErrorMessage("");
 
     const enteredOtp = otp.join("");
@@ -151,6 +153,7 @@ function EmailOtp({
     }
 
     try {
+      requestInFlight.current = true;
       setLoading(true);
 
       const data = await apiRequest("/verify-email-otp", {
@@ -200,17 +203,20 @@ function EmailOtp({
         );
       }
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
+    if (requestInFlight.current) return;
     if (!email) {
       setErrorMessage("Email not found. Please register again.");
       return;
     }
 
     try {
+      requestInFlight.current = true;
       setResending(true);
       setErrorMessage("");
 
@@ -236,6 +242,7 @@ function EmailOtp({
         error.message || "Unable to resend OTP."
       );
     } finally {
+      requestInFlight.current = false;
       setResending(false);
     }
   };
@@ -249,6 +256,13 @@ function EmailOtp({
 
           <div className="mb-8">
             <ProgressStepper activeStep={2} />
+          </div>
+
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#edf1ff] text-[#3155e8]">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
+              <path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
 
           <div className="text-center">
@@ -270,7 +284,7 @@ function EmailOtp({
               Enter OTP
             </label>
 
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-2 max-[380px]:gap-1 max-[340px]:gap-0.5">
               {otp.map((value, index) => (
                 <input
                   key={index}
@@ -280,13 +294,14 @@ function EmailOtp({
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
+                  disabled={!challengeId || loading || resending}
                   value={value}
                   onChange={(e) =>
                     handleOtpChange(index, e.target.value)
                   }
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={(e) => handlePaste(index, e)}
-                  className={`h-11 w-10 rounded-md border text-center text-[16px] font-semibold outline-none ${
+                  className={`h-10 w-10 max-[380px]:h-9 max-[380px]:w-8 max-[340px]:w-7 rounded-md border text-center text-[16px] font-semibold outline-none disabled:bg-[#f5f6f9] ${
                     errorMessage
                       ? "border-red-400 text-red-600"
                       : "border-[#dfe1e8] focus:border-[#3155e8]"
@@ -296,8 +311,8 @@ function EmailOtp({
             </div>
 
             {errorMessage && (
-              <div className="mt-3 text-center">
-                <p className="text-[10px] font-medium text-red-500">
+              <div className="mx-auto mt-3 max-w-[440px] rounded-md bg-[#fff1f2] px-3 py-2 text-center">
+                <p className="text-[10px] font-medium leading-4 text-red-600" role="alert">
                   {errorMessage}
                 </p>
               </div>
@@ -315,7 +330,7 @@ function EmailOtp({
           <button
             type="button"
             onClick={handleVerify}
-            disabled={loading}
+            disabled={loading || resending || !challengeId}
             className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Verifying..." : "Verify Email"}
@@ -326,7 +341,7 @@ function EmailOtp({
             <button
               type="button"
               onClick={handleResend}
-              disabled={resending}
+              disabled={resending || loading}
               className="font-semibold text-[#3155e8] disabled:opacity-50"
             >
               {resending ? "Sending..." : "Resend OTP"}

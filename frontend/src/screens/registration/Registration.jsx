@@ -6,8 +6,16 @@ function Registration({
   form,
   handleChange,
   handleSubmit,
+  onLogin,
   error,
+  submitting = false,
 }) {
+  const errorFor = (field) => {
+    if (!error) return "";
+    const normalized = error.toLowerCase();
+    return normalized.includes(field) ? error : "";
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f8fc] text-[#171923]">
       {/* Header */}
@@ -52,8 +60,15 @@ function Registration({
                     value={form.fullName}
                     onChange={handleChange}
                     placeholder="Priya Sharma"
-                    className="h-[42px] w-full rounded-md border border-[#dfe1e8] px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8]"
+                    className={`h-[42px] w-full rounded-md border px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8] ${
+                      errorFor("name") ? "border-red-400" : "border-[#dfe1e8]"
+                    }`}
                   />
+                  {errorFor("name") && (
+                    <p className="mt-1.5 text-[10px] text-red-500">
+                      {errorFor("name")}
+                    </p>
+                  )}
                 </div>
 
                 {/* Email */}
@@ -69,16 +84,16 @@ function Registration({
                     onChange={handleChange}
                     placeholder="priya.sharma@email.com"
                     className={`h-[42px] w-full rounded-md border px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8] ${
-                      error?.toLowerCase().includes("email")
+                      errorFor("email")
                         ? "border-red-400"
                         : "border-[#dfe1e8]"
                     }`}
                   />
 
                   {/* Email error */}
-                  {error?.toLowerCase().includes("email") && (
+                  {errorFor("email") && (
                     <p className="mt-1.5 text-[10px] text-red-500">
-                      {error}
+                      {errorFor("email")}
                     </p>
                   )}
                 </div>
@@ -94,7 +109,7 @@ function Registration({
                       name="countryCode"
                       value={form.countryCode}
                       onChange={handleChange}
-                      className="h-[42px] w-[92px] rounded-md border border-[#dfe1e8] bg-white px-2 text-[12px] outline-none focus:border-[#3155e8]"
+                      className="h-[42px] w-[92px] shrink-0 rounded-md border border-[#dfe1e8] bg-white px-2 text-[12px] outline-none focus:border-[#3155e8]"
                     >
                       <option value="+91">+91</option>
                       <option value="+1">+1</option>
@@ -108,8 +123,8 @@ function Registration({
                       onChange={handleChange}
                       placeholder="98765 43210"
                       maxLength="10"
-                      className={`h-[42px] flex-1 rounded-md border px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8] ${
-                        error?.toLowerCase().includes("mobile")
+                      className={`h-[42px] min-w-0 flex-1 rounded-md border px-3 text-[12px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8] ${
+                        errorFor("mobile")
                           ? "border-red-400"
                           : "border-[#dfe1e8]"
                       }`}
@@ -117,9 +132,9 @@ function Registration({
                   </div>
 
                   {/* Mobile error */}
-                  {error?.toLowerCase().includes("mobile") && (
+                  {errorFor("mobile") && (
                     <p className="mt-1.5 text-[10px] text-red-500">
-                      {error}
+                      {errorFor("mobile")}
                     </p>
                   )}
                 </div>
@@ -136,8 +151,21 @@ function Registration({
                     value={form.password}
                     onChange={handleChange}
                     placeholder="••••••••••••"
-                    className="h-[42px] w-full rounded-md border border-[#dfe1e8] px-3 text-[13px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8]"
+                    className={`h-[42px] w-full rounded-md border px-3 text-[13px] outline-none placeholder:text-[#a2a5ae] focus:border-[#3155e8] ${
+                      errorFor("password")
+                        ? "border-red-400"
+                        : "border-[#dfe1e8]"
+                    }`}
                   />
+                  {errorFor("password") && (
+                    <p className="mt-1.5 text-[10px] text-red-500">
+                      {errorFor("password")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="lg:hidden">
+                  <PasswordRequirements password={form.password} />
                 </div>
 
                 {/* Terms */}
@@ -154,6 +182,7 @@ function Registration({
                     I agree to the{" "}
                     <button
                       type="button"
+                      onClick={onLogin}
                       className="font-semibold text-[#3155e8]"
                     >
                       Terms & Conditions
@@ -170,7 +199,9 @@ function Registration({
               </div>
 
               {/* RIGHT */}
-              <PasswordRequirements />
+              <div className="hidden lg:block">
+                <PasswordRequirements password={form.password} />
+              </div>
             </div>
 
             {/* General error */}
@@ -187,9 +218,10 @@ function Registration({
             {/* Create Account */}
             <button
               type="submit"
-              className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc]"
+              disabled={submitting}
+              className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Create Account
+              {submitting ? "Creating Account..." : "Create Account"}
             </button>
           </form>
 

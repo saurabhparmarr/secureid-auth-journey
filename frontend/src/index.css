@@ -10,7 +10,16 @@ body,
   min-height: 100%;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
 }

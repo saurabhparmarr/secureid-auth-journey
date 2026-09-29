@@ -43,52 +43,26 @@ function RegistrationSuccess({ setCurrentScreen }) {
           {/* Heading */}
           <div className="mt-6 text-center">
             <h1 className="text-[22px] font-bold tracking-[-0.4px]">
-              Registration successful
+              Account created!
             </h1>
 
             <p className="mx-auto mt-2 max-w-[430px] text-[12px] leading-5 text-[#777b86]">
-              Your SecureID account has been created and multi-factor
-              authentication has been enabled.
+              Your account has been created
+              <br />
+              successfully and MFA is enabled.
             </p>
           </div>
 
           {/* Account Details */}
-          <div className="mt-7 rounded-lg bg-[#fafbfe] p-5">
-            <h2 className="text-[12px] font-semibold text-[#464955]">
-              Account verified
-            </h2>
-
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-[#858894]">
-                  Email
+          <div className="mx-auto mt-6 max-w-[300px] space-y-3">
+            {["Email verified", "Mobile verified", "MFA enabled"].map((item) => (
+              <div key={item} className="flex items-center gap-2 text-[11px] text-[#464955]">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#e7f7ed] text-[10px] font-bold text-[#22a060]" aria-hidden="true">
+                  ✓
                 </span>
-
-                <span className="text-[10px] font-semibold text-[#464955]">
-                  Verified
-                </span>
+                {item}
               </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-[#858894]">
-                  Mobile number
-                </span>
-
-                <span className="text-[10px] font-semibold text-[#464955]">
-                  Verified
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-[#858894]">
-                  MFA
-                </span>
-
-                <span className="text-[10px] font-semibold text-[#22a060]">
-                  Enabled
-                </span>
-              </div>
-            </div>
+            ))}
           </div>
 
           {/* Login */}

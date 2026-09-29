@@ -1,21 +1,25 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Header from "../../components/Header";
 import ProgressStepper from "../../components/ProgressStepper";
 import { apiRequest } from "../../services/api";
 
 function MfaSetup({ userId, setCurrentScreen, setMfaOtpauthUrl }) {
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const requestInFlight = useRef(false);
 
   const handleSetupMfa = async () => {
     if (!userId) {
-      alert("User information not found. Please register again.");
+      setErrorMessage("User information not found. Please register again.");
       return;
     }
 
-    if (loading) return;
+    if (requestInFlight.current) return;
 
     try {
+      requestInFlight.current = true;
       setLoading(true);
+      setErrorMessage("");
       const data = await apiRequest("/mfa/setup", {
         method: "POST",
         body: JSON.stringify({
@@ -28,8 +32,9 @@ function MfaSetup({ userId, setCurrentScreen, setMfaOtpauthUrl }) {
       setCurrentScreen("authenticatorSetup");
     } catch (error) {
       console.error("MFA setup error:", error);
-      alert(error.message);
+      setErrorMessage(error.message || "Unable to set up MFA.");
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
@@ -43,18 +48,6 @@ function MfaSetup({ userId, setCurrentScreen, setMfaOtpauthUrl }) {
           {/* Progress */}
           <div className="mb-8">
             <ProgressStepper activeStep={4} />
-          </div>
-
-          {/* Heading */}
-          <div className="text-center">
-            <h1 className="text-[22px] font-bold tracking-[-0.4px]">
-              Set up multi-factor authentication
-            </h1>
-
-            <p className="mx-auto mt-2 max-w-[440px] text-[12px] leading-5 text-[#777b86]">
-              Add an extra layer of security to your account by setting up an
-              authenticator app.
-            </p>
           </div>
 
           {/* Security icon */}
@@ -77,34 +70,50 @@ function MfaSetup({ userId, setCurrentScreen, setMfaOtpauthUrl }) {
             </svg>
           </div>
 
-          {/* Information */}
-          <div className="mt-7 rounded-lg bg-[#fafbfe] p-5">
-            <h2 className="text-[12px] font-semibold text-[#464955]">
-              Why enable MFA?
-            </h2>
+          {/* Heading */}
+          <div className="mt-4 text-center">
+            <h1 className="text-[22px] font-bold tracking-[-0.4px]">
+              Set up Multi-Factor Auth
+            </h1>
 
-            <p className="mt-2 text-[11px] leading-5 text-[#777b86]">
-              MFA helps protect your account even if your password is
-              compromised.
+            <p className="mx-auto mt-2 max-w-[440px] text-[12px] leading-5 text-[#777b86]">
+              Add an extra layer of security
+              <br />
+              to protect your account.
             </p>
+          </div>
 
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center gap-2 text-[11px] text-[#6d707b]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#3155e8]" />
-                <span>Use an authenticator app</span>
+          <div className="mt-7 space-y-2">
+            <div className="flex min-h-[46px] items-center gap-3 rounded-md border border-[#b8c7ff] bg-[#f7f9ff] px-3">
+              <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-[#3155e8]">
+                <span className="h-2 w-2 rounded-full bg-[#3155e8]" />
+              </span>
+              <div className="min-w-0 text-left">
+                <p className="text-[11px] font-semibold text-[#333744]">Authenticator App</p>
+                <p className="text-[9px] text-[#777b86]">(Google Authenticator / Authy)</p>
               </div>
-
-              <div className="flex items-center gap-2 text-[11px] text-[#6d707b]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#3155e8]" />
-                <span>Scan the QR code during setup</span>
+            </div>
+            <div className="flex min-h-[46px] items-center gap-3 rounded-md border border-[#e4e6ed] px-3">
+              <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-[#9da2b0]" />
+              <div className="min-w-0 text-left">
+                <p className="text-[11px] font-semibold text-[#333744]">SMS Authentication</p>
+                <p className="text-[9px] text-[#777b86]">Receive codes on your mobile</p>
               </div>
-
-              <div className="flex items-center gap-2 text-[11px] text-[#6d707b]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#3155e8]" />
-                <span>Verify the generated security code</span>
+            </div>
+            <div className="flex min-h-[46px] items-center gap-3 rounded-md border border-[#e4e6ed] px-3">
+              <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-[#9da2b0]" />
+              <div className="min-w-0 text-left">
+                <p className="text-[11px] font-semibold text-[#333744]">Email Authentication</p>
+                <p className="text-[9px] text-[#777b86]">Receive codes on your email</p>
               </div>
             </div>
           </div>
+
+          {errorMessage && (
+            <p className="mt-4 rounded-md bg-[#fff1f2] px-3 py-2 text-center text-[10px] leading-4 text-red-600" role="alert">
+              {errorMessage}
+            </p>
+          )}
 
           {/* Set Up MFA */}
           <button
@@ -113,7 +122,7 @@ function MfaSetup({ userId, setCurrentScreen, setMfaOtpauthUrl }) {
             disabled={loading}
             className="mt-7 h-[42px] w-full rounded-md bg-[#2449df] text-[12px] font-semibold text-white transition hover:bg-[#1d3dcc]"
           >
-            Set Up MFA
+            {loading ? "Setting up..." : "Continue"}
           </button>
           {/* Footer */}
           <p className="mt-7 text-center text-[9px] text-[#a0a2aa]">

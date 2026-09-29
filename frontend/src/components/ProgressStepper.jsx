@@ -7,7 +7,7 @@ function ProgressStepper({ activeStep }) {
 
           <div
             className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold ${
-              activeStep === step
+              step <= activeStep
                 ? "bg-[#2449df] text-white"
                 : "border border-[#dfe2eb] bg-white text-[#8e929d]"
             }`}
@@ -16,7 +16,11 @@ function ProgressStepper({ activeStep }) {
           </div>
 
           {index < 4 && (
-            <div className="h-px w-10 bg-[#e2e4eb] sm:w-16" />
+            <div
+              className={`h-px w-6 sm:w-10 lg:w-16 ${
+                step < activeStep ? "bg-[#2449df]" : "bg-[#e2e4eb]"
+              } max-[380px]:w-5`}
+            />
           )}
 
         </div>

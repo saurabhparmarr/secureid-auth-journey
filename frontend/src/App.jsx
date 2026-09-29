@@ -248,6 +248,7 @@ function App() {
 
   // Registration error shown inside the UI
   const [registrationError, setRegistrationError] = useState("");
+  const [registrationSubmitting, setRegistrationSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -299,6 +300,7 @@ function App() {
     }
 
     registrationSubmissionInFlight.current = true;
+    setRegistrationSubmitting(true);
     try {
       const data = await apiRequest("/register", {
         method: "POST",
@@ -327,6 +329,7 @@ function App() {
       );
     } finally {
       registrationSubmissionInFlight.current = false;
+      setRegistrationSubmitting(false);
     }
   };
 
@@ -352,6 +355,7 @@ function App() {
       return (
         <MobileOtp
           userId={userId}
+          mobile={`${form.countryCode} ${form.mobile}`}
           challengeId={challengeId}
           challengeExpiresAt={challengeExpiresAt}
           challengeStatus={challengeStatus}
@@ -406,7 +410,9 @@ function App() {
           form={form}
           handleChange={handleChange}
           handleSubmit={handleSubmit}
+          onLogin={() => handleScreenChange("login")}
           error={registrationError}
+          submitting={registrationSubmitting}
         />
       );
   }
