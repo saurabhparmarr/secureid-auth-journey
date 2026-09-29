@@ -8,11 +8,19 @@ require("dotenv").config();
 const app = express();
 
 const PORT = process.env.PORT || 5000;
+const frontendOrigin =
+  process.env.FRONTEND_URL?.trim() ||
+  (process.env.NODE_ENV === "production" ? null : "http://localhost:5173");
+
+if (!frontendOrigin) {
+  throw new Error("FRONTEND_URL must be configured in production.");
+}
+
 connectDB();
 // Middleware
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: frontendOrigin,
     credentials: true,
   })
 );
